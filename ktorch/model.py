@@ -265,7 +265,7 @@ class Model(object):
             np.random.shuffle(index_array)
             batches = make_batches(len(index_array), batch_size)
             for idx_batch, (idx_start, idx_end) in enumerate(batches):
-                batch_logs = {'batch': idx_batch, 'size': batch_size}
+                batch_logs = {'batch': idx_batch, 'size': idx_end - idx_start}
                 callbacks.on_batch_begin(idx_batch, batch_logs)
 
                 inputs = x[index_array[idx_start:idx_end]]
