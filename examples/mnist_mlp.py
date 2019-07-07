@@ -3,9 +3,6 @@
 Gets to ~98.20% test accuracy after 20 epochs.
 """
 
-from __future__ import print_function
-
-import keras
 from keras.datasets import mnist
 import torch
 from torch.nn import Dropout, Linear, ReLU, Sequential
@@ -14,8 +11,10 @@ from metrics import categorical_accuracy
 from model import Model
 
 BATCH_SIZE = 128
-NUM_CLASSES = 10
+# change to None to run on the CPU, 'cuda:1' to run on GPU 1, etc.
+DEVICE = 'cuda:0'
 EPOCHS = 20
+NUM_CLASSES = 10
 
 # the data, split between train and test sets
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -43,7 +42,7 @@ network = Sequential(
     Dropout(0.2),
     Linear(in_features=512, out_features=NUM_CLASSES),
 )
-model = Model(network)
+model = Model(network, device=DEVICE)
 
 model.compile(
     loss='CrossEntropyLoss', optimizer='Adam', metrics=[categorical_accuracy]

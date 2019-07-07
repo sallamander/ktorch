@@ -16,4 +16,4 @@ def categorical_accuracy(y_true, y_pred):
 
     return torch.sum(
         y_true == torch.argmax(y_pred, dim=-1)
-    ).numpy() / y_true.shape[0]
+    ).cpu().numpy() / y_true.shape[0]

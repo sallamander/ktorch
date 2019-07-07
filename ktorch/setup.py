@@ -17,7 +17,6 @@ setup(
     license='MIT',
     install_requires=[
         'keras>=2.2.4',
-        'torchvision>=0.2.2'
     ],
     extras_require={
         'tests': [
