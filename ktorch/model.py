@@ -130,6 +130,9 @@ class Model(object):
         :type y: torch.Tensor
         :param batch_size: number of samples to use per evaluation step
         :type batch_size: int
+        :return: average metric values calculated between the outputs of the
+         forward pass run on x and y
+        :rtype: tuple(float)
         """
 
         self._assert_compiled()
