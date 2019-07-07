@@ -62,8 +62,7 @@ class TestModel(object):
 
         callbacks = model._default_callbacks(self=model)
         assert isinstance(callbacks[0], BaseLogger)
-        assert isinstance(callbacks[1], ProgbarLogger)
-        assert id(callbacks[2]) == id(model.history)
+        assert id(callbacks[1]) == id(model.history)
 
     def test_compile(self):
         """Test compile method
@@ -205,7 +204,6 @@ class TestModel(object):
         model.fit_generator = Model.fit_generator
         model.evaluate_generator = MagicMock()
         model.evaluate_generator.return_value = (2, 3)
-        model._default_callbacks = MagicMock()
         model.metric_names = ['mock_metric']
 
         generator = MagicMock()
@@ -225,8 +223,12 @@ class TestModel(object):
         ]
 
         for test_case in test_cases:
-            model._default_callbacks.return_value = [1, 2, 3]
+            default_callbacks = MagicMock()
+            default_callbacks.return_value = [1, 2, 3]
+            model._default_callbacks = default_callbacks
             early_stopping = test_case.get('early_stopping', False)
+            if early_stopping:
+                model.stop_training = True
 
             n_steps_per_epoch = test_case['n_steps_per_epoch']
             n_epochs = test_case['n_epochs']
@@ -240,6 +242,11 @@ class TestModel(object):
             monkeypatch.setattr(
                 'model.CallbackList', mock_callback_list
             )
+            mock_progbar = MagicMock()
+            mock_progbar.return_value = 7
+            monkeypatch.setattr(
+                'model.ProgbarLogger', mock_progbar
+            )
 
             model.device = device
             model.fit_generator(
@@ -249,41 +256,34 @@ class TestModel(object):
                 n_validation_steps=n_validation_steps,
                 callbacks=[4, 5]
             )
-            if early_stopping:
-                model.stop_training = True
-                model.fit_generator(
-                    self=model, generator=generator,
-                    n_steps_per_epoch=n_steps_per_epoch, n_epochs=n_epochs,
-                    validation_data=validation_data,
-                    n_validation_steps=n_validation_steps
+            assert model._assert_compiled.call_count == 1
+            assert mock_callbacks.on_train_begin.call_count == 1
+            assert mock_callbacks.on_train_end.call_count == 1
+            if not early_stopping:
+                n_batches = n_steps_per_epoch * n_epochs
+                assert model.train_on_batch.call_count == n_batches
+                model.train_on_batch.assert_called_with(inputs, targets)
+                assert generator.__next__.call_count == n_batches
+                assert mock_callbacks.on_epoch_begin.call_count == n_epochs
+                assert mock_callbacks.on_batch_begin.call_count == n_batches
+                assert mock_callbacks.on_batch_end.call_count == n_batches
+                mock_callbacks.on_batch_end.assert_any_call(
+                    0, {'batch': 0, 'size': 1, 'loss': 4, 'mock_metric': 5}
                 )
-                assert model._assert_compiled.call_count == 2
-                assert mock_callbacks.on_train_begin.call_count == 2
-                assert mock_callbacks.on_train_end.call_count == 2
+
+            mock_callback_list.assert_called_with([1, 2, 3, 7, 4, 5])
+            if validation_data is not None:
+                expected_metrics = [
+                    'loss', 'val_loss', 'mock_metric', 'val_mock_metric'
+                ]
             else:
-                assert model._assert_compiled.call_count == 1
-                assert mock_callbacks.on_train_begin.call_count == 1
-                assert mock_callbacks.on_train_end.call_count == 1
-
-            n_batches = n_steps_per_epoch * n_epochs
-            assert model.train_on_batch.call_count == n_batches
-            model.train_on_batch.assert_called_with(inputs, targets)
-            assert generator.__next__.call_count == n_batches
-
-            mock_callback_list.assert_called_with([1, 2, 3, 4, 5])
+                expected_metrics = ['loss', 'mock_metric']
             mock_callbacks.set_params.assert_called_with(
                 {'epochs': n_epochs,
-                 'metrics':
-                     ['loss', 'val_loss', 'mock_metric', 'val_mock_metric'],
+                 'metrics': expected_metrics,
                  'steps': n_steps_per_epoch, 'verbose': True}
             )
             mock_callbacks.set_model.assert_called_with(model)
-            assert mock_callbacks.on_epoch_begin.call_count == n_epochs
-            assert mock_callbacks.on_batch_begin.call_count == n_batches
-            assert mock_callbacks.on_batch_end.call_count == n_batches
-            mock_callbacks.on_batch_end.assert_any_call(
-                0, {'batch': 0, 'size': 1, 'loss': 4, 'mock_metric': 5}
-            )
 
             epoch_logs = {}
             if validation_data is not None:
@@ -292,7 +292,9 @@ class TestModel(object):
                 )
                 epoch_logs['val_loss'] = 2
                 epoch_logs['val_mock_metric'] = 3
-            mock_callbacks.on_epoch_end.assert_any_call(0, epoch_logs)
+
+            if not early_stopping:
+                mock_callbacks.on_epoch_end.assert_any_call(0, epoch_logs)
 
             # reset the call counts for the next iteration
             model._assert_compiled.call_count = 0

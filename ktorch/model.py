@@ -9,6 +9,7 @@ import numpy as np
 from keras.callbacks import (
     BaseLogger, CallbackList, History, ProgbarLogger
 )
+from keras.engine.training_utils import make_batches
 import torch
 
 
@@ -69,9 +70,7 @@ class Model(object):
         :rtype: list
         """
 
-        default_callbacks = [
-            BaseLogger(), ProgbarLogger(count_mode='steps'), self.history
-        ]
+        default_callbacks = [BaseLogger(), self.history]
         return default_callbacks
 
     def compile(self, optimizer, loss, metrics=None):
@@ -122,6 +121,45 @@ class Model(object):
 
         self._compiled = True
 
+    def evaluate(self, x, y, batch_size):
+        """Evaluate the given data in test mode
+
+        :param x: input data to use for evaluation
+        :type x: torch.Tensor
+        :param y: target data to use for evaluation
+        :type y: torch.Tensor
+        :param batch_size: number of samples to use per evaluation step
+        :type batch_size: int
+        """
+
+        self._assert_compiled()
+
+        if self.device:
+            self.network.to(self.device)
+
+        batches = make_batches(x.shape[0], batch_size)
+        metric_values_per_batch = []
+        batch_sizes = []
+        for idx_start, idx_end in batches:
+            inputs = x[idx_start:idx_end]
+            targets = y[idx_start:idx_end]
+
+            n_obs = inputs.shape[0]
+            batch_sizes.append(n_obs)
+
+            test_outputs = self.test_on_batch(inputs, targets)
+            metric_values_per_batch.append(test_outputs)
+
+        validation_outputs = []
+        for idx_value in range(len(test_outputs)):
+            validation_outputs.append(
+                np.average([
+                    metric_values[idx_value]
+                    for metric_values in metric_values_per_batch
+                ], weights=batch_sizes)
+            )
+        return validation_outputs
+
     def evaluate_generator(self, generator, n_steps):
         """Evaluate the network on batches of data generated from `generator`
 
@@ -161,6 +199,98 @@ class Model(object):
             )
         return validation_outputs
 
+    def fit(self, x, y, batch_size, n_epochs=1, callbacks=None,
+            validation_data=None):
+        """Trains the network on the given data for a fixed number of epochs
+
+        :param x: input data to train on
+        :type x: torch.Tensor
+        :param y: target data to train on
+        :type y: torch.Tensor
+        :param batch_size: number of samples to use per forward and backward
+         pass
+        :type batch_size: int
+        :param n_epochs: number of epochs (iterations of the dataset) to train
+         the model
+        :type n_epochs: int
+        :param callbacks: callbacks to be used during training
+        :type callbacks: list[object]
+        :param validation_data: data on which to evaluate the loss and metrics
+         at the end of each epoch
+        :type validation_data: tuple(numpy.ndarray)
+        """
+
+        default_callbacks = self._default_callbacks()
+        default_callbacks.append(ProgbarLogger(count_mode='samples'))
+        if callbacks:
+            default_callbacks.extend(callbacks)
+        callbacks = CallbackList(default_callbacks)
+
+        self._assert_compiled()
+
+        if self.device:
+            self.network.to(self.device)
+
+        metrics = ['loss']
+        if validation_data is not None:
+            metrics.append('val_loss')
+        for metric_name in self.metric_names:
+            metrics.append(metric_name)
+            if validation_data is not None:
+                metrics.append('val_{}'.format(metric_name))
+
+        index_array = np.arange(x.shape[0])
+        
+        callbacks.set_params({
+            'batch_size': batch_size,
+            'epochs': n_epochs,
+            'metrics': metrics,
+            'steps': None,
+            'samples': x.shape[0],
+            'verbose': True
+        })
+        callbacks.set_model(self)
+
+        callbacks.on_train_begin()
+        for idx_epoch in range(n_epochs):
+            if self.stop_training:
+                break
+
+            epoch_logs = {}
+            callbacks.on_epoch_begin(idx_epoch)
+            
+            np.random.shuffle(index_array)
+            batches = make_batches(len(index_array), batch_size)
+            for idx_batch, (idx_start, idx_end) in enumerate(batches):
+                batch_logs = {'batch': idx_batch, 'size': batch_size}
+                callbacks.on_batch_begin(idx_batch, batch_logs)
+
+                inputs = x[index_array[idx_start:idx_end]]
+                targets = y[index_array[idx_start:idx_end]]
+                train_outputs = self.train_on_batch(inputs, targets)
+
+                batch_logs['loss'] = train_outputs[0]
+                it = zip(self.metric_names, train_outputs[1:])
+                for metric_name, train_output in it:
+                    batch_logs[metric_name] = train_output
+                callbacks.on_batch_end(idx_batch, batch_logs)
+
+                if self.stop_training:
+                    break
+
+            if validation_data:
+                val_outputs = self.evaluate(
+                    validation_data[0], validation_data[1], batch_size
+                )
+
+                epoch_logs['val_loss'] = val_outputs[0]
+                it = zip(self.metric_names, val_outputs[1:])
+                for metric_name, val_output in it:
+                    metric_name = 'val_{}'.format(metric_name)
+                    epoch_logs[metric_name] = val_output
+            callbacks.on_epoch_end(idx_epoch, epoch_logs)
+        callbacks.on_train_end()
+
     def fit_generator(self, generator, n_steps_per_epoch, n_epochs=1,
                       validation_data=None, n_validation_steps=None,
                       callbacks=None):
@@ -186,6 +316,7 @@ class Model(object):
         """
 
         default_callbacks = self._default_callbacks()
+        default_callbacks.append(ProgbarLogger(count_mode='steps'))
         if callbacks:
             default_callbacks.extend(callbacks)
         callbacks = CallbackList(default_callbacks)
@@ -206,10 +337,13 @@ class Model(object):
         if self.device:
             self.network.to(self.device)
 
-        metrics = ['loss', 'val_loss']
+        metrics = ['loss']
+        if validation_data is not None:
+            metrics.append('val_loss')
         for metric_name in self.metric_names:
             metrics.append(metric_name)
-            metrics.append('val_{}'.format(metric_name))
+            if validation_data is not None:
+                metrics.append('val_{}'.format(metric_name))
 
         callbacks.set_params({
             'epochs': n_epochs,
