@@ -33,6 +33,6 @@ def test_categorical_accuracy():
 
         y_pred = np.array(test_case['y_pred'])
         y_pred = torch.from_numpy(y_pred)
-        
+
         accuracy = categorical_accuracy(y_true, y_pred)
         assert np.isclose(accuracy, test_case['expected_accuracy'])

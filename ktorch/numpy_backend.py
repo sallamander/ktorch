@@ -290,7 +290,8 @@ def pool(x, pool_size, strides, padding, data_format, pool_mode):
         y = []
         for (k, k1) in zip(range(pool_size[0]), range(-pool_size[0], 0)):
             for (l, l1) in zip(range(pool_size[1]), range(-pool_size[1], 0)):
-                for (m, m1) in zip(range(pool_size[2]), range(-pool_size[2], 0)):
+                it = zip(range(pool_size[2]), range(-pool_size[2], 0))
+                for (m, m1) in it:
                     y.append(x[:,
                                :,
                                k:k1:strides[0],
@@ -361,10 +362,13 @@ def rnn(step_function, inputs, initial_states,
         time_index = time_index[::-1]
 
     outputs = []
-    states_tm1 = initial_states  # tm1 means "t minus one" as in "previous timestep"
+    # tm1 means "t minus one" as in  "previous timestep"
+    states_tm1 = initial_states
     output_tm1 = np.zeros(output_sample.shape)
     for t in time_index:
-        output_t, states_t = step_function(inputs[:, t], states_tm1 + constants)
+        output_t, states_t = step_function(
+            inputs[:, t], states_tm1 + constants
+        )
         if mask is not None:
             output_t = np.where(output_mask[:, t], output_t, output_tm1)
             states_t = [np.where(state_mask[:, t], state_t, state_tm1)
@@ -712,10 +716,12 @@ def batch_dot(x, y, axes=None):
     d1 = x.shape[axes[0]]
     d2 = y.shape[axes[1]]
     if d1 != d2:
-        raise ValueError('Can not do batch_dot on inputs with shapes ' +
-                         str(x.shape) + ' and ' + str(y.shape) +
-                         ' with axes=' + str(axes) + '. x.shape[%d] != '
-                         'y.shape[%d] (%d != %d).' % (axes[0], axes[1], d1, d2))
+        raise ValueError(
+            'Can not do batch_dot on inputs with shapes ' +
+            str(x.shape) + ' and ' + str(y.shape) +
+            ' with axes=' + str(axes) + '. x.shape[%d] != ' +
+            'y.shape[%d] (%d != %d).' % (axes[0], axes[1], d1, d2)
+        )
 
     result = []
     axes = [axes[0] - 1, axes[1] - 1]  # ignore batch dimension
@@ -803,11 +809,13 @@ def ndim(x):
     return x.ndim
 
 
-def random_uniform_variable(shape, low, high, dtype=None, name=None, seed=None):
+def random_uniform_variable(shape, low, high, dtype=None,
+                            name=None, seed=None):
     return (high - low) * np.random.random(shape).astype(dtype) + low
 
 
-def random_normal_variable(shape, mean, scale, dtype=None, name=None, seed=None):
+def random_normal_variable(shape, mean, scale, dtype=None,
+                           name=None, seed=None):
     return scale * np.random.randn(*shape).astype(dtype) + mean
 
 

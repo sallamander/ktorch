@@ -243,7 +243,7 @@ class Model(object):
                 metrics.append('val_{}'.format(metric_name))
 
         index_array = np.arange(x.shape[0])
-        
+
         callbacks.set_params({
             'batch_size': batch_size,
             'epochs': n_epochs,
@@ -261,7 +261,7 @@ class Model(object):
 
             epoch_logs = {}
             callbacks.on_epoch_begin(idx_epoch)
-            
+
             np.random.shuffle(index_array)
             batches = make_batches(len(index_array), batch_size)
             for idx_batch, (idx_start, idx_end) in enumerate(batches):
