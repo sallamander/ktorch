@@ -1,5 +1,8 @@
 """Trains a simple convnet on the MNIST dataset.
 
+Reference Implementation:
+    https://github.com/keras-team/keras/blob/master/examples/mnist_cnn.py
+
 Gets to ~98.6%  test accuracy after 12 epochs.
 """
 

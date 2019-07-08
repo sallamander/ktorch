@@ -1,5 +1,8 @@
 """Trains an LSTM model on the IMDB sentiment classification task.
 
+Reference Implementation:
+    https://github.com/keras-team/keras/blob/master/examples/imdb_lstm.py
+
 **Notes**
 - The dataset is actually too small for LSTM to be of any advantage compared to
   simpler, much faster methods such as TF-IDF + LogReg.

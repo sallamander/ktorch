@@ -1,5 +1,8 @@
 """Trains a simple deep NN on the MNIST dataset.
 
+Reference Implementation:
+    https://github.com/keras-team/keras/blob/master/examples/mnist_mlp.py
+
 Gets to ~98.20% test accuracy after 20 epochs.
 """
 

@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """Sequence to sequence learning for performing addition
 
+Reference Implementation:
+    https://github.com/keras-team/keras/blob/master/examples/addition_rnn.py
+
 Input: "535+61"
 Output: "596"
 Padding is handled by using a repeated sentinel character (space)
