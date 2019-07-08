@@ -3,7 +3,38 @@
 import numpy as np
 import torch
 
-from metrics import categorical_accuracy
+from metrics import binary_accuracy, categorical_accuracy
+
+
+def test_binary_accuracy():
+    """Test binary_accuracy"""
+
+    test_cases = [
+        {'y_true': [0, 1, 0, 0, 1],
+         'y_pred': [0.6, 0.4, 0.25, 0.35, 0.6],
+         'expected_accuracy': 0.6},
+        {'y_true': [0, 1, 0, 0, 1],
+         'y_pred': [0.6, 0.4, 0.5, 0.5, 0.4],
+         'expected_accuracy': 0.4},
+        {'y_true': [0, 1, 0, 0, 1],
+         'y_pred': [0.6, 0.4, 0.6, 0.6, 0.4],
+         'expected_accuracy': 0},
+        {'y_true': [1, 0, 0, 0, 0],
+         'y_pred': [0.6, 0.4, 0.4, 0.4, 0.4],
+         'expected_accuracy': 1},
+    ]
+
+    for test_case in test_cases:
+        y_true = np.array(test_case['y_true'])
+        y_true = torch.from_numpy(y_true).float()
+
+        y_pred = np.array(test_case['y_pred'])
+        y_pred = torch.from_numpy(y_pred)
+
+        accuracy = binary_accuracy(y_true, y_pred)
+        assert np.isclose(
+            accuracy, test_case['expected_accuracy'], atol=1e-4
+        )
 
 
 class TestCategoricalAccuracy(object):
