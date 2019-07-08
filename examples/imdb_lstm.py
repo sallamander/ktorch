@@ -14,8 +14,8 @@ from keras.datasets import imdb
 import torch
 from torch.nn import Embedding, Linear, LSTM, Module, Sequential, Sigmoid
 
-from metrics import binary_accuracy
-from model import Model
+from ktorch.metrics import binary_accuracy
+from ktorch.model import Model
 
 BATCH_SIZE = 4
 # change to None to run on CPU, 'cuda:1' to run on GPU 1, etc.

@@ -7,8 +7,8 @@ from keras.datasets import mnist
 import torch
 from torch.nn import Dropout, Linear, ReLU, Sequential
 
-from metrics import categorical_accuracy
-from model import Model
+from ktorch.metrics import categorical_accuracy
+from ktorch.model import Model
 
 BATCH_SIZE = 128
 # change to None to run on the CPU, 'cuda:1' to run on GPU 1, etc.

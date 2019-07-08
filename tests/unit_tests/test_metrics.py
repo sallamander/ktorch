@@ -3,7 +3,7 @@
 import numpy as np
 import torch
 
-from metrics import binary_accuracy, categorical_accuracy
+from ktorch.metrics import binary_accuracy, categorical_accuracy
 
 
 def test_binary_accuracy():

@@ -34,8 +34,8 @@ import numpy as np
 import torch
 from torch.nn import Linear, Module, ModuleList
 
-from metrics import categorical_accuracy
-from model import Model
+from ktorch.metrics import categorical_accuracy
+from ktorch.model import Model
 
 # === Parameters for the model === #
 DEVICE = 'cuda:0'  # change to None for CPU, 'cuda:1' for GPU 1, etc.

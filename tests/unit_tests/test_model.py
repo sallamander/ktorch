@@ -10,7 +10,7 @@ from keras.callbacks import (
 import pytest
 import torch
 
-from model import Model
+from ktorch.model import Model
 
 
 class TestModel(object):
@@ -240,12 +240,12 @@ class TestModel(object):
             mock_callbacks = create_autospec(CallbackList)
             mock_callback_list.return_value = mock_callbacks
             monkeypatch.setattr(
-                'model.CallbackList', mock_callback_list
+                'ktorch.model.CallbackList', mock_callback_list
             )
             mock_progbar = MagicMock()
             mock_progbar.return_value = 7
             monkeypatch.setattr(
-                'model.ProgbarLogger', mock_progbar
+                'ktorch.model.ProgbarLogger', mock_progbar
             )
 
             model.device = device
