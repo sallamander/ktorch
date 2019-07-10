@@ -1,6 +1,6 @@
-# Ktorch examples directory
+# KTorch examples directory
 
-*Note*: Each of these examples were copied from the [Keras examples](https://github.com/keras-team/keras/tree/master/examples) directory and minimally modified to make use of a network constructued using PyTorch and trained with Ktorch. More examples will be added in the future, but if you see a particular Keras example that you'd like to be replicated with Ktorch, please let us know by filing an issue requesting it!
+*Note*: Each of these examples were copied from the [Keras examples](https://github.com/keras-team/keras/tree/master/examples) directory and minimally modified to make use of a network constructued using PyTorch and trained with KTorch. More examples will be added in the future, but if you see a particular Keras example that you'd like to be replicated with KTorch, please let us know by filing an issue requesting it!
 
 ## Vision model examples
 
