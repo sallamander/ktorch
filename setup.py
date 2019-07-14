@@ -19,10 +19,14 @@ setup(
     author='Sean Sall',
     author_email='ssall@alumni.nd.edu',
     url="https://github.com/sallamander/ktorch",
-    download_url="https://github.com/sallamander/ktorch/archive/v0.1-alpha.tar.gz",
+    download_url=(
+        "https://github.com/sallamander/ktorch/archive/v0.1-alpha.tar.gz"
+    ),
     license='MIT',
     install_requires=[
         'keras>=2.2.4',
+        'tensorboard>=1.14',
+        'future>=0.17.1'
     ],
     extras_require={
         'tests': [
