@@ -1,11 +1,23 @@
 """Callbacks for training with PyTorch
 
-Reference Implementation in:
+Reference Implementations in:
     - https://github.com/keras-team/keras/blob/master/keras/callbacks.py
+
+Keras callbacks that work out of the box with the ktorch.Model class and that
+are exposed from this module by importing them:
+    - CallbackList
+    - CSVLogger
+    - EarlyStopping
+    - History
+    - ModelCheckpoint
+    - ProgbarLogger
 """
 
 
-from keras.callbacks import Callback
+from keras.callbacks import (
+    Callback, CallbackList, CSVLogger, EarlyStopping, History, ModelCheckpoint,
+    ProgbarLogger
+)
 from tensorboard.compat.proto.summary_pb2 import Summary
 from torch.utils.tensorboard.writer import FileWriter
 
