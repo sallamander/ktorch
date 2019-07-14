@@ -15,8 +15,8 @@ from ktorch.model import Model
 
 BATCH_SIZE = 128
 # change to None to run on the CPU, 'cuda:1' to run on GPU 1, etc.
-DEVICE = 'cuda:0'
-EPOCHS = 20
+DEVICE = None
+EPOCHS = 1
 NUM_CLASSES = 10
 
 # the data, split between train and test sets

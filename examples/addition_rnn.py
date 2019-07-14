@@ -41,7 +41,7 @@ from ktorch.metrics import categorical_accuracy
 from ktorch.model import Model
 
 # === Parameters for the model === #
-DEVICE = 'cuda:0'  # change to None for CPU, 'cuda:1' for GPU 1, etc.
+DEVICE = None  # change to None for CPU, 'cuda:1' for GPU 1, etc.
 N_EPOCHS = 127
 # Try replacing LSTM with GRU or RNN
 RNN = torch.nn.LSTM
@@ -238,7 +238,7 @@ model.compile(
 
 # Train the model each generation and show predictions against the validation
 # dataset
-for iteration in range(1, N_EPOCHS):
+for iteration in range(0, N_EPOCHS):
     print()
     print('-' * 50)
     print('Iteration', iteration)
@@ -252,7 +252,7 @@ for iteration in range(1, N_EPOCHS):
         ind = np.random.randint(0, len(x_val))
         rowx, rowy = x_val[np.array([ind])], y_val[np.array([ind])]
         rowx = rowx.to(DEVICE)
-        preds = model.network.forward(rowx)
+        preds = model.predict(rowx, batch_size=1)
         _, preds = torch.max(preds, 1)
         q = ctable.decode(rowx[0])
         correct = ctable.decode(rowy[0], calc_argmax=False)

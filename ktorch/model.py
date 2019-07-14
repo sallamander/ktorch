@@ -402,6 +402,27 @@ class Model(object):
 
         self.network.load_state_dict(torch.load(fpath_weights))
 
+    def predict(self, x, batch_size):
+        """Generate output predictions for the input samples
+
+        :param x: input data to predict on
+        :type x: torch.Tensor
+        :param batch_size: number of samples to predict on at one time
+        :type batch_size: int
+        :return: array of predictions
+        :rtype: numpy.ndarray
+        """
+
+        batches = make_batches(len(x), batch_size)
+        predictions_per_batch = []
+        for idx_batch, (idx_start, idx_end) in enumerate(batches):
+            inputs = x[idx_start:idx_end]
+            predictions = self.network.forward(inputs)
+            predictions_per_batch.append(predictions)
+
+        batch_predictions = torch.cat(predictions_per_batch)
+        return batch_predictions
+
     def save_weights(self, fpath_weights, overwrite=True):
         """Dumps all layers and weights to the provided `fpath_weights`
 
