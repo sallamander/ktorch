@@ -30,7 +30,7 @@ network = Sequential(
 Next, build a `Model` using that network:
 
 ```python
-from ktorch import Model
+from ktorch.model import Model
 
 model = Model(network)
 ```
