@@ -1,10 +1,10 @@
 """Setup file"""
 
-from setuptools import setup
+from setuptools import find_packages, setup
 
 setup(
     name='ktorch',
-    version='0.1',
+    version='0.2',
     description=(
         'A repository providing a Keras-like interface for training and '
         'predicting with PyTorch networks.'
@@ -20,7 +20,7 @@ setup(
     author_email='ssall@alumni.nd.edu',
     url="https://github.com/sallamander/ktorch",
     download_url=(
-        "https://github.com/sallamander/ktorch/archive/v0.1-alpha.tar.gz"
+        "https://github.com/sallamander/ktorch/archive/v0.2-alpha.tar.gz"
     ),
     license='MIT',
     install_requires=[
@@ -40,5 +40,6 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
-    ]
+    ],
+    packages=find_packages()
 )
