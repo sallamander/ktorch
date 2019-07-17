@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='ktorch',
-    version='0.2',
+    version='0.5',
     description=(
         'A repository providing a Keras-like interface for training and '
         'predicting with PyTorch networks.'
@@ -20,7 +20,7 @@ setup(
     author_email='ssall@alumni.nd.edu',
     url="https://github.com/sallamander/ktorch",
     download_url=(
-        "https://github.com/sallamander/ktorch/archive/v0.2-alpha.tar.gz"
+        "https://github.com/sallamander/ktorch/archive/v0.5-alpha.tar.gz"
     ),
     license='MIT',
     install_requires=[
