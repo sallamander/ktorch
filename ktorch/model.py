@@ -41,6 +41,7 @@ class Model(object):
 
         self.history = History()
         self.stop_training = False
+        self._ckpt_saved_epoch = None
 
     def _assert_compiled(self):
         """Raise a value error if the model is not compiled
