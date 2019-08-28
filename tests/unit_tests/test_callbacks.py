@@ -1,4 +1,4 @@
-"""Tests for ktorch.callbacks"""
+"""Tests for callbacks.py"""
 
 from unittest.mock import call, MagicMock
 
@@ -54,11 +54,11 @@ class TestTensorBoard(object):
 
             if 'log_dir' in test_case:
                 mock_file_writer.assert_called_once_with(
-                    logdir=test_case['log_dir']
+                    log_dir=test_case['log_dir']
                 )
             else:
                 mock_file_writer.assert_called_once_with(
-                    logdir='./logs'
+                    log_dir='./logs'
                 )
 
             mock_init.assert_called_once_with()

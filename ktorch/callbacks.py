@@ -43,7 +43,7 @@ class TensorBoard(Callback):
         super().__init__()
 
         self.update_freq = update_freq
-        self.writer = FileWriter(logdir=log_dir)
+        self.writer = FileWriter(log_dir=log_dir)
         self.samples_seen = 0
 
     def _write_logs(self, logs, index):
