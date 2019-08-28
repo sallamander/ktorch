@@ -1,9 +1,14 @@
 """Unit tests for metrics"""
 
+from unittest.mock import MagicMock
+
 import numpy as np
+import pytest
 import torch
 
-from ktorch.metrics import binary_accuracy, categorical_accuracy
+from ktorch.metrics import (
+    binary_accuracy, categorical_accuracy, TopKCategoricalAccuracy
+)
 
 
 def test_binary_accuracy():
@@ -164,7 +169,7 @@ class TestTopKCategoricalAccuracy(object):
             [0.1, 0.2, 0.3, 0.4, 0.0],
             [0.2, 0.3, 0.3, 0.075, 0.125],
             [0.025, 0.05, 0.075, 0.15, 0.70],
-            [0.2, 0.2, 0.2, 0.3, 0.1],
+            [0.25, 0.2, 0.2, 0.3, 0.1],
             [0.2, 0.3, 0.1, 0.25, 0.25],
             [0.1, 0.2, 0.3, 0.4, 0.0],
             [0.2, 0.3, 0.3, 0.075, 0.125],
@@ -229,7 +234,7 @@ class TestTopKCategoricalAccuracy(object):
         mock_metric.k = 2
         mock_metric.__call__ = TopKCategoricalAccuracy.__call__
 
-        expected_categorical_accuracy = 0.30
+        expected_categorical_accuracy = 0.20
         categorical_accuracy = mock_metric.__call__(
             self=mock_metric, y_true=y_true, y_pred=y_pred
         )

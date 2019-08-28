@@ -20,17 +20,21 @@ class Model(object):
     - https://github.com/keras-team/keras/blob/master/keras/engine/training.py
     """
 
-    def __init__(self, network, device=None):
+    def __init__(self, network, gpu_id=None):
         """Init
 
         :param network: pytorch network to train or evaluate
         :type network: torch.nn.Module
-        :param device: device to train the network on, e.g. 'cuda:0'
-        :type device: str
+        :param gpu_id: GPU to train the network on
+        :type gpu_id: int
         """
 
         self.network = network
-        self.device = device
+        self.gpu_id = gpu_id
+        if self.gpu_id is not None:
+            self.device = torch.device('cuda:0')
+        else:
+            self.device = None
 
         self._compiled = False
         # these are set in the `compile` method

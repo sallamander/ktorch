@@ -23,11 +23,11 @@ class TestModel(object):
         """
 
         network = MagicMock()
-        device = MagicMock()
+        gpu_id = MagicMock()
 
-        model = Model(network, device)
+        model = Model(network, gpu_id)
         assert id(network) == id(model.network)
-        assert id(device) == id(model.device)
+        assert id(gpu_id) == id(model.gpu_id)
         assert not model._compiled
         assert not model.optimizer
         assert not model.loss
