@@ -83,9 +83,9 @@ class Model(object):
 
         This sets `self.optimizer` and `self.loss` in place.
 
-        :param optimizer: class name of the optimizer to use when training, one
-         of those from `torch.optim` (e.g. `Adam`)
-        :type optimizer: str
+        :param optimizer: class name of the optimizer to use when training (one
+         of those from `torch.optim` (e.g. `Adam`)) or optimizer instance
+        :type optimizer: str or object
         :param loss: class name of the loss to use when training, one of those
          from `torch.nn` (e.g. `CrossEntropyLoss`)
         :type loss: str
@@ -95,16 +95,18 @@ class Model(object):
         :raises AttributeError: if an invalid optimizer or loss function is
          specified
         """
-
-        try:
-            Optimizer = getattr(torch.optim, optimizer)
-        except AttributeError:
-            msg = (
-                '`optimizer` must be a `str` representing an optimizer from '
-                'the `torch.optim` package, and {} is not a valid one.'
-            )
-            raise AttributeError(msg.format(optimizer))
-        self.optimizer = Optimizer(self.network.parameters())
+        
+        if isinstance(optimizer, str):
+            try:
+                Optimizer = getattr(torch.optim, optimizer)
+            except AttributeError:
+                msg = (
+                    '`optimizer` must be a `str` representing an optimizer from '
+                    'the `torch.optim` package, and {} is not a valid one.'
+                )
+                raise AttributeError(msg.format(optimizer))
+            optimizer = Optimizer(self.network.parameters())
+        self.optimizer = optimizer
 
         try:
             Loss = getattr(torch.nn, loss)
