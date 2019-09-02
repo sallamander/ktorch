@@ -8,7 +8,7 @@ from torch.utils.tensorboard.writer import FileWriter
 from ktorch.callbacks import TensorBoard
 
 
-class TestTensorBoard(object):
+class TestTensorBoard():
     """Test for TensorBoard"""
 
     @pytest.fixture(scope='class')

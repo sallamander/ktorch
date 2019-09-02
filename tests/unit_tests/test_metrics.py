@@ -1,4 +1,4 @@
-"""Unit tests for metrics"""
+"""Unit tests for metrics.py"""
 
 from unittest.mock import MagicMock
 
@@ -42,7 +42,7 @@ def test_binary_accuracy():
         )
 
 
-class TestCategoricalAccuracy(object):
+class TestCategoricalAccuracy():
     """Tests for categorical_accuracy"""
 
     def test_categorical_accuracy__seqlen_equals_1(self):
@@ -137,7 +137,7 @@ class TestCategoricalAccuracy(object):
             )
 
 
-class TestTopKCategoricalAccuracy(object):
+class TestTopKCategoricalAccuracy():
     """Tests for TopKCategoricalAccuracy"""
 
     @pytest.fixture(scope='class')

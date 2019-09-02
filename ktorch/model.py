@@ -13,7 +13,7 @@ from keras.engine.training_utils import make_batches
 import torch
 
 
-class Model(object):
+class Model():
     """Model for training / evaluating pytorch networks
 
     Reference Implementation:
@@ -95,14 +95,15 @@ class Model(object):
         :raises AttributeError: if an invalid optimizer or loss function is
          specified
         """
-        
+
         if isinstance(optimizer, str):
             try:
                 Optimizer = getattr(torch.optim, optimizer)
             except AttributeError:
                 msg = (
-                    '`optimizer` must be a `str` representing an optimizer from '
-                    'the `torch.optim` package, and {} is not a valid one.'
+                    '`optimizer` must be a `str` representing an optimizer '
+                    'from the `torch.optim` package, and {} is not a valid '
+                    'one.'
                 )
                 raise AttributeError(msg.format(optimizer))
             optimizer = Optimizer(self.network.parameters())

@@ -1,4 +1,4 @@
-"""Unit tests for model"""
+"""Unit tests for model.py"""
 
 from itertools import product
 from unittest.mock import create_autospec, patch, MagicMock
@@ -13,7 +13,7 @@ import torch
 from ktorch.model import Model
 
 
-class TestModel(object):
+class TestModel():
     """Tests for Model"""
 
     def test_init(self):

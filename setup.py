@@ -30,6 +30,7 @@ setup(
     ],
     extras_require={
         'tests': [
+            'pandas>=0.25.1',
             'pytest',
             'pytest-pep8'
         ]
