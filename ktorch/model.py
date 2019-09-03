@@ -86,9 +86,9 @@ class Model():
         :param optimizer: class name of the optimizer to use when training (one
          of those from `torch.optim` (e.g. `Adam`)) or optimizer instance
         :type optimizer: str or object
-        :param loss: class name of the loss to use when training, one of those
-         from `torch.nn` (e.g. `CrossEntropyLoss`)
-        :type loss: str
+        :param loss: class name of the loss to use when training (one of those
+         from `torch.nn` (e.g. `CrossEntropyLoss`)) or loss instance
+        :type loss: str or object
         :param metrics: metrics to be evaluated by the model during training
          and testing
         :type metrics: list[object]
@@ -101,23 +101,29 @@ class Model():
                 Optimizer = getattr(torch.optim, optimizer)
             except AttributeError:
                 msg = (
-                    '`optimizer` must be a `str` representing an optimizer '
-                    'from the `torch.optim` package, and {} is not a valid '
-                    'one.'
+                    '`optimizer` must be a `str` that specifies an optimizer '
+                    'class from the `torch.optim` package or an optimizer '
+                    'instance. You passed {}, a `str` that is not a valid '
+                    'optimizer from the `torch.optim` '
+                    'package'.format(optimizer)
                 )
                 raise AttributeError(msg.format(optimizer))
             optimizer = Optimizer(self.network.parameters())
         self.optimizer = optimizer
 
-        try:
-            Loss = getattr(torch.nn, loss)
-        except AttributeError:
-            msg = (
-                '`loss` must be a `str` representing a loss from '
-                'the `torch.nn` package, and {} is not a valid one.'
-            )
-            raise AttributeError(msg.format(loss))
-        self.loss = Loss()
+        if isinstance(loss, str):
+            try:
+                Loss = getattr(torch.nn, loss)
+            except AttributeError:
+                msg = (
+                    '`loss` must be a `str` that specifies a loss '
+                    'class from the `torch.loss` package or a loss '
+                    'instance. You passed {}, a `str` that is not a valid '
+                    'loss from the `torch.nn` package.'.format(loss)
+                )
+                raise AttributeError(msg.format(loss))
+            loss = Loss()
+        self.loss = loss
 
         metrics = [] if not metrics else metrics
         for metric in metrics:

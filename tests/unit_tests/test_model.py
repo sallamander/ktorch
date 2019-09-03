@@ -9,6 +9,7 @@ import torch
 from keras.callbacks import (
     BaseLogger, CallbackList, History, ProgbarLogger
 )
+from torch.nn import BCELoss, CrossEntropyLoss, L1Loss
 from torch.optim import Adam, RMSprop
 
 from ktorch.model import Model
@@ -96,7 +97,10 @@ class TestModel():
             Adam(params=mock_parameters, lr=1e-4),
             RMSprop(params=mock_parameters, lr=1e-5)
         ]
-        valid_losses = ['BCELoss', 'CrossEntropyLoss', 'L1Loss']
+        valid_losses = [
+            'BCELoss', 'CrossEntropyLoss', 'L1Loss',
+            BCELoss(), CrossEntropyLoss(), L1Loss()
+        ]
 
         mock_metric = MagicMock()
         mock_metric.name = 'mock_metric'

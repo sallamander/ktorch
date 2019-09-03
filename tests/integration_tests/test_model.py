@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 import torch
 from keras.callbacks import CSVLogger, EarlyStopping, ModelCheckpoint
-from torch.nn import Conv2d, Linear, Module, ReLU
+from torch.nn import Conv2d, CrossEntropyLoss, Linear, Module, ReLU
 
 from ktorch.callbacks import TensorBoard
 from ktorch.metrics import categorical_accuracy, TopKCategoricalAccuracy
@@ -179,7 +179,7 @@ class TestModel():
 
         model = Model(mock_network)
         model.compile(
-            optimizer=mock_optimizer, loss='CrossEntropyLoss',
+            optimizer=mock_optimizer, loss=CrossEntropyLoss(),
             metrics=mock_metrics
         )
         model.fit_generator(
