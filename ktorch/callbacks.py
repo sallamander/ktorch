@@ -49,10 +49,12 @@ class TensorBoard(Callback):
     def _write_logs(self, logs, index):
         """Write log values to the log files
 
-        :param logs:
-        :type logs:
-        :param index:
-        :type index:
+        :param logs: holds the loss and metric values computed at the most
+         recent interval (batch or epoch)
+        :type logs: dict
+        :param index: if update_freq='batch', the total number of samples that
+         have been seen, else if update_freq='epoch', the epoch index
+        :type index: int
         """
 
         for name, value in logs.items():
