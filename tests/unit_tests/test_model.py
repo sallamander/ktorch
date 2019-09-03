@@ -4,11 +4,12 @@ from itertools import product
 from unittest.mock import create_autospec, patch, MagicMock
 
 import numpy as np
+import pytest
+import torch
 from keras.callbacks import (
     BaseLogger, CallbackList, History, ProgbarLogger
 )
-import pytest
-import torch
+from torch.optim import Adam, RMSprop
 
 from ktorch.model import Model
 
@@ -85,13 +86,16 @@ class TestModel():
 
         network = MagicMock()
         parameters_fn = MagicMock()
-        parameters_fn.return_value = [
-            torch.nn.Parameter(torch.randn((64, 64)))
-        ]
+        mock_parameters = [torch.nn.Parameter(torch.randn((64, 64)))]
+        parameters_fn.return_value = mock_parameters
         network.parameters = parameters_fn
         model.network = network
 
-        valid_optimizers = ['Adam', 'RMSprop']
+        valid_optimizers = [
+            'Adam', 'RMSprop',
+            Adam(params=mock_parameters, lr=1e-4),
+            RMSprop(params=mock_parameters, lr=1e-5)
+        ]
         valid_losses = ['BCELoss', 'CrossEntropyLoss', 'L1Loss']
 
         mock_metric = MagicMock()
