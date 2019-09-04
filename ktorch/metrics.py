@@ -14,12 +14,12 @@ def binary_accuracy(y_true, y_pred):
     :param y_pred: predicted target values, of shape (batch_size, )
     :type y_pred: torch.Tensor
     :return: binary accuracy
-    :rtype: numpy.ndarray
+    :rtype: scalar
     """
 
     return torch.mean(
         (y_true == (y_pred > 0.5).float()).float()
-    ).cpu().numpy()
+    ).item()
 
 
 def categorical_accuracy(y_true, y_pred):
@@ -38,12 +38,12 @@ def categorical_accuracy(y_true, y_pred):
      be ommited if 1
     :type y_pred: torch.Tensor
     :return: categorical accuracy
-    :rtype: numpy.ndarray
+    :rtype: scalar
     """
 
     return torch.mean(
         (y_true == torch.argmax(y_pred, dim=1)).float()
-    ).cpu().numpy()
+    ).item()
 
 
 class TopKCategoricalAccuracy(object):
@@ -78,4 +78,4 @@ class TopKCategoricalAccuracy(object):
         )
         n_correctly_classified = n_correctly_classified.float()
 
-        return (n_correctly_classified / y_true.shape[0]).tolist()
+        return (n_correctly_classified / y_true.shape[0]).item()

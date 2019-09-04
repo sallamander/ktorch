@@ -162,7 +162,7 @@ def check_fit_generator(dirpath_model, gpu_id=None):
         params=mock_network.parameters(), lr=1e-4
     )
 
-    model = Model(mock_network)
+    model = Model(mock_network, n_outputs=1, gpu_id=gpu_id)
     model.compile(
         optimizer=mock_optimizer, loss=CrossEntropyLoss(),
         metrics=mock_metrics

@@ -20,16 +20,19 @@ class Model():
     - https://github.com/keras-team/keras/blob/master/keras/engine/training.py
     """
 
-    def __init__(self, network, gpu_id=None):
+    def __init__(self, network, n_outputs, gpu_id=None):
         """Init
 
         :param network: pytorch network to train or evaluate
         :type network: torch.nn.Module
+        :param n_outputs: number of network outputs
+        :type n_outputs: int
         :param gpu_id: GPU to train the network on
         :type gpu_id: int
         """
 
         self.network = network
+        self.n_outputs = n_outputs
         self.gpu_id = gpu_id
         if self.gpu_id is not None:
             self.device = torch.device('cuda:0')
@@ -130,7 +133,13 @@ class Model():
             metric_name = (
                 metric.name if hasattr(metric, 'name') else metric.__name__
             )
-            self.metric_names.append(metric_name)
+            if self.n_outputs > 1:
+                for idx_output in range(1, self.n_outputs + 1):
+                    self.metric_names.append(
+                        '{}{}'.format(metric_name, idx_output)
+                    )
+            else:
+                self.metric_names.append(metric_name)
             self.metric_fns.append(metric)
 
         self._compiled = True
@@ -159,7 +168,12 @@ class Model():
         batch_sizes = []
         for idx_start, idx_end in batches:
             inputs = x[idx_start:idx_end]
-            targets = y[idx_start:idx_end]
+            if self.n_outputs > 1:
+                targets = []
+                for idx_output in range(self.n_outputs):
+                    targets.append(y[idx_output][idx_start:idx_end])
+            else:
+                targets = y[idx_start:idx_end]
 
             n_obs = inputs.shape[0]
             batch_sizes.append(n_obs)
@@ -249,8 +263,14 @@ class Model():
             self.network.to(self.device)
 
         metrics = ['loss']
+        if self.n_outputs > 1:
+            for idx_output in range(1, self.n_outputs + 1):
+                metrics.append('loss{}'.format(idx_output))
         if validation_data is not None:
             metrics.append('val_loss')
+            if self.n_outputs > 1:
+                for idx_output in range(1, self.n_outputs + 1):
+                    metrics.append('val_loss{}'.format(idx_output))
         for metric_name in self.metric_names:
             metrics.append(metric_name)
             if validation_data is not None:
@@ -283,11 +303,27 @@ class Model():
                 callbacks.on_batch_begin(idx_batch, batch_logs)
 
                 inputs = x[index_array[idx_start:idx_end]]
-                targets = y[index_array[idx_start:idx_end]]
+                if self.n_outputs > 1:
+                    targets = []
+                    for idx_output in range(self.n_outputs):
+                        targets.append(
+                            y[idx_output][index_array[idx_start:idx_end]]
+                        )
+                else:
+                    targets = y[index_array[idx_start:idx_end]]
                 train_outputs = self.train_on_batch(inputs, targets)
 
                 batch_logs['loss'] = train_outputs[0]
-                it = zip(self.metric_names, train_outputs[1:])
+                if self.n_outputs > 1:
+                    for idx_output in range(1, self.n_outputs + 1):
+                        batch_logs['loss{}'.format(idx_output)] = (
+                            train_outputs[idx_output]
+                        )
+
+                idx_metric_values = (
+                    1 if self.n_outputs == 1 else self.n_outputs + 1
+                )
+                it = zip(self.metric_names, train_outputs[idx_metric_values:])
                 for metric_name, train_output in it:
                     batch_logs[metric_name] = train_output
                 callbacks.on_batch_end(idx_batch, batch_logs)
@@ -301,7 +337,16 @@ class Model():
                 )
 
                 epoch_logs['val_loss'] = val_outputs[0]
-                it = zip(self.metric_names, val_outputs[1:])
+                if self.n_outputs > 1:
+                    for idx_output in range(1, self.n_outputs + 1):
+                        epoch_logs['val_loss{}'.format(idx_output)] = (
+                            val_outputs[idx_output]
+                        )
+
+                idx_metric_values = (
+                    1 if self.n_outputs == 1 else self.n_outputs + 1
+                )
+                it = zip(self.metric_names, val_outputs[idx_metric_values:])
                 for metric_name, val_output in it:
                     metric_name = 'val_{}'.format(metric_name)
                     epoch_logs[metric_name] = val_output
@@ -355,8 +400,14 @@ class Model():
             self.network.to(self.device)
 
         metrics = ['loss']
+        if self.n_outputs > 1:
+            for idx_output in range(1, self.n_outputs + 1):
+                metrics.append('loss{}'.format(idx_output))
         if validation_data is not None:
             metrics.append('val_loss')
+            if self.n_outputs > 1:
+                for idx_output in range(1, self.n_outputs + 1):
+                    metrics.append('val_loss{}'.format(idx_output))
         for metric_name in self.metric_names:
             metrics.append(metric_name)
             if validation_data is not None:
@@ -382,11 +433,27 @@ class Model():
                 batch_logs = {'batch': idx_batch, 'size': 1}
                 callbacks.on_batch_begin(idx_batch, batch_logs)
 
-                inputs, targets = next(generator)
+                generator_output = next(generator)
+                if len(generator_output) != 2:
+                    msg = (
+                        'Output of generator should be a tuple of '
+                        '(inputs, targets), but instead got a {}: '
+                        '{}.'
+                    ).format(type(generator_output), str(generator_output))
+                inputs, targets = generator_output
                 train_outputs = self.train_on_batch(inputs, targets)
 
                 batch_logs['loss'] = train_outputs[0]
-                it = zip(self.metric_names, train_outputs[1:])
+                if self.n_outputs > 1:
+                    for idx_output in range(1, self.n_outputs + 1):
+                        batch_logs['loss{}'.format(idx_output)] = (
+                            train_outputs[idx_output]
+                        )
+
+                idx_metric_values = (
+                    1 if self.n_outputs == 1 else self.n_outputs + 1
+                )
+                it = zip(self.metric_names, train_outputs[idx_metric_values:])
                 for metric_name, train_output in it:
                     batch_logs[metric_name] = train_output
                 callbacks.on_batch_end(idx_batch, batch_logs)
@@ -400,7 +467,16 @@ class Model():
                 )
 
                 epoch_logs['val_loss'] = val_outputs[0]
-                it = zip(self.metric_names, val_outputs[1:])
+                if self.n_outputs > 1:
+                    for idx_output in range(1, self.n_outputs + 1):
+                        epoch_logs['val_loss{}'.format(idx_output)] = (
+                            val_outputs[idx_output]
+                        )
+
+                idx_metric_values = (
+                    1 if self.n_outputs == 1 else self.n_outputs + 1
+                )
+                it = zip(self.metric_names, val_outputs[idx_metric_values:])
                 for metric_name, val_output in it:
                     metric_name = 'val_{}'.format(metric_name)
                     epoch_logs[metric_name] = val_output
@@ -470,14 +546,35 @@ class Model():
         self.network.train(mode=False)
         if self.device:
             inputs = inputs.to(self.device)
-            targets = targets.to(self.device)
+            if isinstance(targets, list):
+                for idx_target in range(len(targets)):
+                    targets[idx_target] = targets[idx_target].to(self.device)
+            else:
+                targets = targets.to(self.device)
 
         outputs = self.network(inputs)
-        loss = self.loss(outputs, targets)
+        test_outputs = []
+        if isinstance(outputs, (list, tuple)):
+            partial_losses = []
+            for output, target in zip(outputs, targets):
+                partial_loss = self.loss(output, target)
+                partial_losses.append(partial_loss)
 
-        test_outputs = [loss.tolist()]
+            loss = torch.sum(torch.stack(partial_losses))
+            test_outputs.append(loss.item())
+
+            for partial_loss in partial_losses:
+                test_outputs.append(partial_loss.item())
+        else:
+            loss = self.loss(outputs, targets)
+            test_outputs.append(loss.item())
+
         for metric_fn in self.metric_fns:
-            test_outputs.append(metric_fn(targets, outputs))
+            if isinstance(outputs, (list, tuple)):
+                for output, target in zip(outputs, targets):
+                    test_outputs.append(metric_fn(target, output))
+            else:
+                test_outputs.append(metric_fn(targets, outputs))
 
         return test_outputs
 
@@ -498,14 +595,35 @@ class Model():
         self.network.train(mode=True)
         if self.device:
             inputs = inputs.to(self.device)
-            targets = targets.to(self.device)
+            if isinstance(targets, list):
+                for idx_target in range(len(targets)):
+                    targets[idx_target] = targets[idx_target].to(self.device)
+            else:
+                targets = targets.to(self.device)
 
         outputs = self.network(inputs)
-        loss = self.loss(outputs, targets)
+        train_outputs = []
+        if isinstance(outputs, (list, tuple)):
+            partial_losses = []
+            for output, target in zip(outputs, targets):
+                partial_loss = self.loss(output, target)
+                partial_losses.append(partial_loss)
 
-        train_outputs = [loss.tolist()]
+            loss = torch.sum(torch.stack(partial_losses))
+            train_outputs.append(loss.item())
+
+            for partial_loss in partial_losses:
+                train_outputs.append(partial_loss.item())
+        else:
+            loss = self.loss(outputs, targets)
+            train_outputs.append(loss.item())
+
         for metric_fn in self.metric_fns:
-            train_outputs.append(metric_fn(targets, outputs))
+            if isinstance(outputs, (list, tuple)):
+                for output, target in zip(outputs, targets):
+                    train_outputs.append(metric_fn(target, output))
+            else:
+                train_outputs.append(metric_fn(targets, outputs))
 
         self.optimizer.zero_grad()
         loss.backward()

@@ -13,7 +13,7 @@ There are a number of libraries out there that offer high level training / evalu
 
 # Getting Started: 30 seconds to KTorch
 
-The core data structure of KTorch is the __Model__ class, modeled after the Keras [`Model`](https://keras.io/models/model/) class. It acts as a container for networks that are constructed using layers of [`torch.nn.Module`](https://pytorch.org/docs/stable/_modules/torch/nn/modules/module.html) objects, and allows for easy training and evaluation of PyTorch networks.
+The core data structure of KTorch is the __Model__ class, modeled after the Keras [`Model`](https://keras.io/models/model/) class. It acts as a container for networks that are constructed using layers of [`torch.nn.Module`](https://pytorch.org/docs/stable/_modules/torch/nn/modules/module.html) objects, and allows for easy training and evaluation of PyTorch networks. While the initialization of a KTorch `Model` is a bit different than that of the Keras `Model` (users are asked to specify a bit more up front), the remaining functionality is largerly the same. To use the KTorch `Model` class...
 
 First, construct a network (using either the `torch.nn.Sequential` class or by creating a subclass of `torch.nn.Module`):
 
@@ -32,7 +32,7 @@ Next, build a `Model` using that network:
 ```python
 from ktorch.model import Model
 
-model = Model(network)
+model = Model(network, n_outputs=1)
 ```
 
 Configure the learning process with `.compile()`:
