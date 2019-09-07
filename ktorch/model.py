@@ -43,6 +43,8 @@ class Model():
         # these are set in the `compile` method
         self.optimizer = None
         self.loss = None
+        self.loss_functions = None
+        self.loss_weights = None
         self.metric_names = []
         self.metric_fns = []
 
@@ -64,6 +66,49 @@ class Model():
                    'the `compile` method before training.')
             raise RuntimeError(msg)
 
+    def _load_compile_arguments(self, argument_name, argument_value):
+        """Load the given argument passed from the `compile` object
+
+        :param argument_name: one of 'loss' or 'optimizer'
+        :type argument_name: str
+        :param argument_value: object to load
+        :type argument_value: object or str
+        :return: the loaded object
+        :rtype: object
+        """
+
+        if argument_name == 'loss':
+            package_location = torch.nn
+            package_location_str = 'torch.nn'
+        else:
+            package_location = torch.optim
+            package_location_str = 'torch.optim'
+
+        if isinstance(argument_value, str):
+            try:
+                ObjectClass = getattr(package_location, argument_value)
+            except AttributeError:
+                msg = (
+                    '`{argument_name}` must be a `str` that specifies a '
+                    '{argument_name} from the {package_location_str} package '
+                    'or a {argument_name} instance. You passed '
+                    '{argument_value}, a `str` that is not a valid '
+                    '{argument_name} from the {package_location_str} package.'
+                ).format(
+                    argument_name=argument_name,
+                    package_location_str=package_location_str,
+                    argument_value=argument_value
+                )
+                raise AttributeError(msg.format(argument_value))
+            if argument_name == 'loss':
+                object_instance = ObjectClass()
+            else:
+                object_instance = ObjectClass(self.network.parameters())
+        else:
+            object_instance = argument_value
+
+        return object_instance
+
     def _load_default_callbacks(self):
         """Return default callbacks automatically applied during training
 
@@ -81,10 +126,11 @@ class Model():
         default_callbacks = [BaseLogger(), self.history]
         return default_callbacks
 
-    def compile(self, optimizer, loss, metrics=None):
+    def compile(self, optimizer, loss, metrics=None, loss_weights=None):
         """Setup the model for training
 
-        This sets `self.optimizer` and `self.loss` in place.
+        This sets `self.optimizer`, `self.loss`, and `self.loss_functions` in
+        place.
 
         :param optimizer: class name of the optimizer to use when training (one
          of those from `torch.optim` (e.g. `Adam`)) or optimizer instance
@@ -95,38 +141,46 @@ class Model():
         :param metrics: metrics to be evaluated by the model during training
          and testing
         :type metrics: list[object]
+        :param loss_weights: scalar coefficients to weight the loss
+         contributions of different model outputs
+        :type loss_weights: list[float]
         :raises AttributeError: if an invalid optimizer or loss function is
          specified
         """
 
-        if isinstance(optimizer, str):
-            try:
-                Optimizer = getattr(torch.optim, optimizer)
-            except AttributeError:
-                msg = (
-                    '`optimizer` must be a `str` that specifies an optimizer '
-                    'class from the `torch.optim` package or an optimizer '
-                    'instance. You passed {}, a `str` that is not a valid '
-                    'optimizer from the `torch.optim` '
-                    'package'.format(optimizer)
-                )
-                raise AttributeError(msg.format(optimizer))
-            optimizer = Optimizer(self.network.parameters())
-        self.optimizer = optimizer
+        self.optimizer = self._load_compile_arguments('optimizer', optimizer)
 
-        if isinstance(loss, str):
-            try:
-                Loss = getattr(torch.nn, loss)
-            except AttributeError:
-                msg = (
-                    '`loss` must be a `str` that specifies a loss '
-                    'class from the `torch.loss` package or a loss '
-                    'instance. You passed {}, a `str` that is not a valid '
-                    'loss from the `torch.nn` package.'.format(loss)
-                )
-                raise AttributeError(msg.format(loss))
-            loss = Loss()
+        if isinstance(loss, (list)) and not len(loss) == self.n_outputs:
+            msg = (
+                'When passing a list as a loss, it should have one entry '
+                'per model output. The model has {} outputs, but you '
+                'passed loss={}'.format(self.n_outputs, str(loss))
+            )
+            raise ValueError(msg)
         self.loss = loss
+
+        if loss_weights is not None and not isinstance(loss_weights, list):
+            msg = (
+                '`loss_weights` must be a list, but is a {}. You passed= {}'
+            ).format(type(loss_weights), str(loss_weights))
+            raise ValueError(msg)
+
+        if loss_weights is not None and len(loss_weights) != self.n_outputs:
+            msg = (
+                'When passing a list for loss_weights, it should have one '
+                'entry per model output. The model has {} outputs, but you '
+                'passed loss_weights={}'
+            ).format(self.n_outputs, str(loss_weights))
+            raise ValueError(msg)
+        self.loss_weights = (
+            loss_weights if loss_weights else [1.0] * self.n_outputs
+        )
+
+        loss_functions = []
+        losses = loss if isinstance(loss, list) else [loss] * self.n_outputs
+        for loss in losses:
+            loss_functions.append(self._load_compile_arguments('loss', loss))
+        self.loss_functions = loss_functions
 
         metrics = [] if not metrics else metrics
         for metric in metrics:
@@ -535,46 +589,45 @@ class Model():
         :param inputs: inputs to predict on
         :type inputs: torch.Tensor
         :param targets: targets to compare model predictions to
-        :type targets: torch.Tensor
+        :type targets: torch.Tensor or list[torch.Tensor]
         :return: metrics calculated between the outputs of the forward pass and
          the targets
         :rtype: tuple(float)
         """
 
         self._assert_compiled()
+        if isinstance(targets, torch.Tensor):
+            targets = [targets]
 
         self.network.train(mode=False)
         if self.device:
             inputs = inputs.to(self.device)
-            if isinstance(targets, list):
-                for idx_target in range(len(targets)):
-                    targets[idx_target] = targets[idx_target].to(self.device)
-            else:
-                targets = targets.to(self.device)
+            for idx_target in range(len(targets)):
+                targets[idx_target] = targets[idx_target].to(self.device)
 
         outputs = self.network(inputs)
+        if isinstance(outputs, torch.Tensor):
+            outputs = [outputs]
+
+        losses = []
         test_outputs = []
-        if isinstance(outputs, (list, tuple)):
-            partial_losses = []
-            for output, target in zip(outputs, targets):
-                partial_loss = self.loss(output, target)
-                partial_losses.append(partial_loss)
+        it = zip(outputs, targets, self.loss_functions, self.loss_weights)
+        for output, target, loss_fn, loss_weight in it:
+            loss_value = loss_fn(output, target)
+            losses.append(loss_value * loss_weight)
+            test_outputs.append(loss_value.item())
+        loss = torch.sum(torch.stack(losses))
 
-            loss = torch.sum(torch.stack(partial_losses))
-            test_outputs.append(loss.item())
-
-            for partial_loss in partial_losses:
-                test_outputs.append(partial_loss.item())
+        if self.n_outputs > 1:
+            test_outputs.insert(0, loss.item())
         else:
-            loss = self.loss(outputs, targets)
-            test_outputs.append(loss.item())
+            assert len(test_outputs) == 1
+            assert len(self.loss_weights) == 1
+            test_outputs[0] = test_outputs[0] * self.loss_weights[0]
 
         for metric_fn in self.metric_fns:
-            if isinstance(outputs, (list, tuple)):
-                for output, target in zip(outputs, targets):
-                    test_outputs.append(metric_fn(target, output))
-            else:
-                test_outputs.append(metric_fn(targets, outputs))
+            for output, target in zip(outputs, targets):
+                test_outputs.append(metric_fn(target, output))
 
         return test_outputs
 
@@ -584,46 +637,45 @@ class Model():
         :param inputs: inputs to use in the forward / backward pass
         :type inputs: torch.Tensor
         :param targets: targets to use in the forward / backward pass
-        :type targets: torch.Tensor
+        :type targets: torch.Tensor or list[torch.Tensor]
         :return: metrics calculated between the outputs of the forward pass and
          the targets
         :rtype: tuple(float)
         """
 
         self._assert_compiled()
+        if isinstance(targets, torch.Tensor):
+            targets = [targets]
 
         self.network.train(mode=True)
         if self.device:
             inputs = inputs.to(self.device)
-            if isinstance(targets, list):
-                for idx_target in range(len(targets)):
-                    targets[idx_target] = targets[idx_target].to(self.device)
-            else:
-                targets = targets.to(self.device)
+            for idx_target in range(len(targets)):
+                targets[idx_target] = targets[idx_target].to(self.device)
 
         outputs = self.network(inputs)
+        if isinstance(outputs, torch.Tensor):
+            outputs = [outputs]
+
+        losses = []
         train_outputs = []
-        if isinstance(outputs, (list, tuple)):
-            partial_losses = []
-            for output, target in zip(outputs, targets):
-                partial_loss = self.loss(output, target)
-                partial_losses.append(partial_loss)
+        it = zip(outputs, targets, self.loss_functions, self.loss_weights)
+        for output, target, loss_fn, loss_weight in it:
+            loss_value = loss_fn(output, target)
+            losses.append(loss_value * loss_weight)
+            train_outputs.append(loss_value.item())
+        loss = torch.sum(torch.stack(losses))
 
-            loss = torch.sum(torch.stack(partial_losses))
-            train_outputs.append(loss.item())
-
-            for partial_loss in partial_losses:
-                train_outputs.append(partial_loss.item())
+        if self.n_outputs > 1:
+            train_outputs.insert(0, loss.item())
         else:
-            loss = self.loss(outputs, targets)
-            train_outputs.append(loss.item())
+            assert len(train_outputs) == 1
+            assert len(self.loss_weights) == 1
+            train_outputs[0] = train_outputs[0] * self.loss_weights[0]
 
         for metric_fn in self.metric_fns:
-            if isinstance(outputs, (list, tuple)):
-                for output, target in zip(outputs, targets):
-                    train_outputs.append(metric_fn(target, output))
-            else:
-                train_outputs.append(metric_fn(targets, outputs))
+            for output, target in zip(outputs, targets):
+                train_outputs.append(metric_fn(target, output))
 
         self.optimizer.zero_grad()
         loss.backward()

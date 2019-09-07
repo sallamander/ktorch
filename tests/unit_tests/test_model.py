@@ -20,19 +20,25 @@ from ktorch.model import Model
 class TestModel():
     """Tests for Model with a single input / output network"""
 
-    def _check_train_or_test_on_batch(self, check):
+    def _check_train_or_test_on_batch(self, check, monkeypatch):
         """Assert the output from train_on_batch or test_on_batch
 
         :param check: what method to test, one of 'train' or 'test'
         :type check: str
+        :param monkeypatch: monkeypatch object
+        :type monkeypatch: _pytest.monkeypatch.MonkeyPatch
         """
 
         if check == 'train':
             call_fn = Model.train_on_batch
+            loss_weights = [np.random.random()]
         else:
             call_fn = Model.test_on_batch
+            loss_weights = [np.random.random()]
 
         model = create_autospec(Model)
+        model.n_outputs = 1
+        model.loss_weights = loss_weights
         model.device = 'cpu'
         model.network = MagicMock()
 
@@ -45,43 +51,48 @@ class TestModel():
         input_values = torch.randn((2, 3), requires_grad=True)
         inputs.to.return_value = input_values
 
-        targets = MagicMock()
-        targets.to = MagicMock()
+        targets = create_autospec(torch.Tensor)
         target_values = (
             torch.randint(size=(2,), high=2, dtype=torch.int64)
         )
         targets.to.return_value = target_values
         outputs = torch.nn.Sigmoid()(input_values)
+        model.network.return_value = outputs
 
-        model.loss = MagicMock()
+        loss_function = MagicMock()
         loss_value = torch.nn.CrossEntropyLoss()(outputs, target_values)
-        model.loss.return_value = loss_value
+        loss_function.side_effect = lambda outputs, targets: loss_value
+        model.loss_functions = [loss_function]
         model.optimizer = create_autospec(torch.optim.Adam)
 
-        with patch.object(loss_value, 'backward') as patched_backward:
-            outputs = call_fn(self=model, inputs=inputs, targets=targets)
+        mock_sum = create_autospec(torch.sum)
+        sum_return_value = create_autospec(torch.Tensor)
+        mock_sum.side_effect = lambda inputs: sum_return_value
+        monkeypatch.setattr('ktorch.model.torch.sum', mock_sum)
+
+        outputs = call_fn(self=model, inputs=inputs, targets=targets)
 
         inputs.to.assert_called_once_with('cpu')
         targets.to.assert_called_once_with('cpu')
 
-        assert outputs[0] == loss_value.tolist()
+        assert np.allclose(outputs[0], (loss_value.item() * loss_weights[0]))
         assert outputs[1] == 4
 
         assert mock_metric.call_count == 1
+        assert loss_function.call_count == 1
         assert model.network.call_count == 1
-        assert model.loss.call_count == 1
         assert model._assert_compiled.call_count == 1
 
         if check == 'train':
             model.network.train.assert_called_with(mode=True)
             assert model.optimizer.zero_grad.call_count == 1
             assert model.optimizer.step.call_count == 1
-            assert patched_backward.call_count == 1
+            assert sum_return_value.backward.call_count == 1
         else:
             model.network.train.assert_called_with(mode=False)
             assert model.optimizer.zero_grad.call_count == 0
             assert model.optimizer.step.call_count == 0
-            assert patched_backward.call_count == 0
+            assert sum_return_value.backward.call_count == 0
 
     def test_init(self):
         """Test __init__ method
@@ -121,36 +132,16 @@ class TestModel():
         model._compiled = True
         model._assert_compiled(self=model)
 
-    def test_load_default_callbacks(self):
-        """Test _load_default_callbacks method"""
+    def test_load_compile_arguments(self):
+        """Test _load_compile_arguments
 
-        model = MagicMock()
-        model.history = MagicMock()
-        model._load_default_callbacks = Model._load_default_callbacks
-
-        callbacks = model._load_default_callbacks(self=model)
-        assert isinstance(callbacks[0], BaseLogger)
-        assert id(callbacks[1]) == id(model.history)
-
-    def test_compile(self):
-        """Test compile method
-
-        This tests several things:
-        - An `AttributeError` is raised if an invalid optimizer or loss
-          function is passed in
-        - `Model.loss` and `Model.optimizer` are set correctly when a valid
-          optimizer and loss are passed in
-        - `Model._compiled` is True after `compile` is called
+        This is more or less a smoke test, ensuring that when a valid optimizer
+        or loss is passed there are no errors thrown, and when an invalid
+        optimizer or loss is passed, an error is thrown.
         """
 
         model = MagicMock()
-        model.n_outputs = 1
-        model.optimizer = None
-        model.loss = None
-        model._compiled = False
-        model.compile = Model.compile
-        model.metric_names = []
-        model.metric_fns = []
+        model._load_compile_arguments = Model._load_compile_arguments
 
         network = MagicMock()
         parameters_fn = MagicMock()
@@ -169,6 +160,73 @@ class TestModel():
             BCELoss(), CrossEntropyLoss(), L1Loss()
         ]
 
+        for optimizer in valid_optimizers:
+            model._load_compile_arguments(
+                self=model, argument_name='optimizer', argument_value=optimizer
+            )
+
+            if isinstance(optimizer, str):
+                assert parameters_fn.call_count == 1
+                # reset for the next iteration of the for loop
+                parameters_fn.call_count = 0
+
+        for loss in valid_losses:
+            model._load_compile_arguments(
+                self=model, argument_name='loss', argument_value=loss
+            )
+
+        with pytest.raises(AttributeError):
+            model._load_compile_arguments(
+                self=model, argument_name='optimizer', argument_value='BCELoss'
+            )
+        with pytest.raises(AttributeError):
+            model._load_compile_arguments(
+                self=model, argument_name='loss', argument_value='BadLoss'
+            )
+
+    def test_load_default_callbacks(self):
+        """Test _load_default_callbacks method"""
+
+        model = MagicMock()
+        model.history = MagicMock()
+        model._load_default_callbacks = Model._load_default_callbacks
+
+        callbacks = model._load_default_callbacks(self=model)
+        assert isinstance(callbacks[0], BaseLogger)
+        assert id(callbacks[1]) == id(model.history)
+
+    def test_compile(self):
+        """Test compile method
+
+        This tests several things:
+        - `Model.losses`, `Model.optimizer`, and `Model.loss_weights` are set
+          correctly when a valid optimizer and loss are passed in
+        - `Model._compiled` is True after `compile` is called
+        """
+
+        model = MagicMock()
+        model.n_outputs = 1
+        model.optimizer = None
+        model.loss = None
+        model.loss_functions = None
+        model.loss_weights = None
+        model._compiled = False
+        model.compile = Model.compile
+        model.metric_names = []
+        model.metric_fns = []
+
+        mock_parameters = [torch.nn.Parameter(torch.randn((64, 64)))]
+        valid_optimizers = [
+            'Adam', 'RMSprop',
+            Adam(params=mock_parameters, lr=1e-4),
+            RMSprop(params=mock_parameters, lr=1e-5)
+        ]
+
+        valid_losses = [
+            ['BCELoss'], 'CrossEntropyLoss', 'L1Loss',
+            BCELoss(), [CrossEntropyLoss()], L1Loss()
+        ]
+
         mock_metric = MagicMock()
         mock_metric.name = 'mock_metric'
         metrics = [mock_metric]
@@ -176,14 +234,19 @@ class TestModel():
         for optimizer, loss in product(valid_optimizers, valid_losses):
             assert not model.optimizer
             assert not model.loss
+            assert not model.loss_functions
             assert not model._compiled
 
             model.compile(
-                self=model, optimizer=optimizer, loss=loss, metrics=metrics
+                self=model, optimizer=optimizer, loss=loss, metrics=metrics,
+                loss_weights=[1.0]
             )
 
             assert model.optimizer
-            assert model.loss
+            assert model.loss == loss
+            assert isinstance(model.loss_functions, list)
+            assert len(model.loss_functions) == 1
+            assert model.loss_weights == [1.0]
             assert model._compiled
             assert model.metric_names == ['mock_metric']
             assert model.metric_fns == [mock_metric]
@@ -191,15 +254,16 @@ class TestModel():
             # reset for next iteration
             model.optimizer = None
             model.loss = None
+            model.loss_functions = None
             model._compiled = False
             model.metric_names = []
             model.metric_fns = []
 
-        with pytest.raises(AttributeError):
-            model.compile(self=model, optimizer='BadOptimizer', loss='BCELoss')
-
-        with pytest.raises(AttributeError):
-            model.compile(self=model, optimizer='Adam', loss='BadLoss')
+        with pytest.raises(ValueError):
+            model.compile(
+                self=model, optimizer=optimizer, loss=loss, metrics=metrics,
+                loss_weights=1.0
+            )
 
     def test_evaluate(self):
         """Test evaluate"""
@@ -327,6 +391,9 @@ class TestModel():
 
         This tests that the correct total number of steps are taken for a given
         `fit` call with a specified `x`, `y`, `batch_size`, and `n_epochs`.
+
+        :param monkeypatch: monkeypatch object
+        :type monkeypatch: _pytest.monkeypatch.MonkeyPatch
         """
 
         model = MagicMock()
@@ -446,6 +513,9 @@ class TestModel():
         This tests that the correct total number of steps are taken for a given
         `fit_generator` call with a specified `n_steps_per_epoch` and
         `n_epochs`.
+
+        :param monkeypatch: monkeypatch object
+        :type monkeypatch: _pytest.monkeypatch.MonkeyPatch
         """
 
         model = MagicMock()
@@ -595,6 +665,9 @@ class TestModel():
         - That `torch.load` is called as expected; it mocks this function to
           prevent anything from actually being loaded from disk
         - That the `Model.network.load_state_dict` method is called
+
+        :param monkeypatch: monkeypatch object
+        :type monkeypatch: _pytest.monkeypatch.MonkeyPatch
         """
 
         model = MagicMock()
@@ -643,35 +716,146 @@ class TestModel():
             )
             assert model.network.state_dict.call_count == 1
 
-    def test_test_on_batch(self):
-        """Test test_on_batch method"""
+    def test_test_on_batch(self, monkeypatch):
+        """Test test_on_batch method
 
-        self._check_train_or_test_on_batch(check='test')
+        :param monkeypatch: monkeypatch object
+        :type monkeypatch: _pytest.monkeypatch.MonkeyPatch
+        """
 
-    def test_train_on_batch(self):
-        """Test train_on_batch method"""
+        self._check_train_or_test_on_batch(
+            check='test', monkeypatch=monkeypatch
+        )
 
-        self._check_train_or_test_on_batch(check='train')
+    def test_train_on_batch(self, monkeypatch):
+        """Test train_on_batch method
+
+        :param monkeypatch: monkeypatch object
+        :type monkeypatch: _pytest.monkeypatch.MonkeyPatch
+        """
+
+        self._check_train_or_test_on_batch(
+            check='train', monkeypatch=monkeypatch
+        )
 
 
 class TestModel__MultiOutput():
     """Tests for Model with a single input, multiple output network"""
 
-    def _check_train_or_test_on_batch(self, check):
+    def _check_compile__multiple_loss_fns(self, model, metrics, optimizer):
+        """Assert results from the `compile` method using multiple losses
+
+        When multiple losses are passed, they must be in an iterable whose
+        length is equal to `self.n_outputs`. Otherwise, a `ValueError` is
+        thrown.
+
+        :param model: mock model object that has the necessary attributes set
+         on it to test the `compile` method
+        :type model: MagicMock
+        :param metrics: metrics to pass to the `compile` method
+        :type metrics: list[MagicMock]
+        :param optimizer: optimizer to pass to the `compile` method
+        :type optimizer: torch.optim.Optimizer
+        """
+
+        assert not model.optimizer
+        assert not model.loss
+        assert not model.loss_functions
+        assert not model._compiled
+
+        loss = [BCELoss(), 'BCELoss']
+        model.compile(
+            self=model, optimizer=optimizer, loss=loss, metrics=metrics,
+            loss_weights=[0.5, 0.25]
+        )
+
+        assert model.optimizer
+        assert model.loss == loss
+        assert isinstance(model.loss_functions, list)
+        assert len(model.loss_functions) == 2
+        assert model.loss_weights == [0.5, 0.25]
+        assert model._compiled
+        assert model.metric_names == (
+            ['metric11', 'metric12', 'metric21', 'metric22']
+        )
+        assert model.metric_fns == metrics
+
+        with pytest.raises(ValueError):
+            loss = [BCELoss()]
+            model.compile(
+                self=model, optimizer=optimizer, loss=loss, metrics=metrics
+            )
+
+        with pytest.raises(ValueError):
+            loss = [BCELoss()]
+            model.compile(
+                self=model, optimizer=optimizer, loss=loss, metrics=metrics,
+                loss_weights=[0.5, 0.25, 0.25]
+            )
+
+    def _check_compile__single_loss_fn(self, model, metrics, optimizer):
+        """Assert results from the `compile` method when passing a single loss
+
+        When a single loss function is passed, the same loss function is
+        applied to each of the outputs of the model.
+
+        :param model: mock model object that has the necessary attributes set
+         on it to test the `compile` method
+        :type model: MagicMock
+        :param metrics: metrics to pass to the `compile` method
+        :type metrics: list[MagicMock]
+        :param optimizer: optimizer to pass to the `compile` method
+        :type optimizer: torch.optim.Optimizer
+        """
+
+        assert not model.optimizer
+        assert not model.loss
+        assert not model.loss_functions
+        assert not model._compiled
+
+        loss = BCELoss()
+        model.compile(
+            self=model, optimizer=optimizer, loss=loss, metrics=metrics,
+        )
+
+        assert model.optimizer
+        assert model.loss == loss
+        assert isinstance(model.loss_functions, list)
+        assert len(model.loss_functions) == 2
+        assert model.loss_weights == [1.0, 1.0]
+        assert model._compiled
+        assert model.metric_names == (
+            ['metric11', 'metric12', 'metric21', 'metric22']
+        )
+        assert model.metric_fns == metrics
+
+        with pytest.raises(ValueError):
+            model.compile(
+                self=model, optimizer=optimizer, loss=loss, metrics=metrics,
+                loss_weights=[0.5]
+            )
+
+    def _check_train_or_test_on_batch(self, check, monkeypatch):
         """Assert the output from train_on_batch or test_on_batch
 
         :param check: what method to test, one of 'train' or 'test'
         :type check: str
+        :param monkeypatch: monkeypatch object
+        :type monkeypatch: _pytest.monkeypatch.MonkeyPatch
         """
 
         model = create_autospec(Model)
 
         if check == 'train':
             call_fn = Model.train_on_batch
+            loss_weights = [1.0, 1.0]
         else:
             call_fn = Model.test_on_batch
+            loss_weights = [0.5, 0.25]
 
         model = create_autospec(Model)
+        model.n_outputs = 2
+        model.loss_weights = loss_weights
         model.device = 'cpu'
         model.network = MagicMock()
 
@@ -706,48 +890,43 @@ class TestModel__MultiOutput():
         )
         model.metric_fns = [mock_metric1, mock_metric2]
 
-        loss = create_autospec(torch.Tensor)
-        loss.side_effect = (
+        loss_function = create_autospec(torch.Tensor)
+        loss_function.side_effect = (
             lambda outputs, targets: (torch.mean(outputs - targets) * 3)
         )
-        model.loss = loss
+        model.loss_functions = [loss_function, loss_function]
         model.optimizer = create_autospec(torch.optim.Adam)
 
-        with patch.object(loss, 'backward') as patched_backward:
-            outputs = call_fn(self=model, inputs=inputs, targets=targets)
+        outputs = call_fn(self=model, inputs=inputs, targets=targets)
 
         inputs.to.assert_called_once_with('cpu')
         target1.to.assert_called_once_with('cpu')
         target2.to.assert_called_once_with('cpu')
 
         assert model.network.call_count == 1
-        assert loss.call_count == 2
+        assert loss_function.call_count == 2
         assert mock_metric1.call_count == 2
         assert mock_metric2.call_count == 2
 
         assert model._assert_compiled.call_count
+        total_loss = 2.25 * loss_weights[0] + -3.0 * loss_weights[1]
         assert np.allclose(
-            outputs, [-0.75, 2.25, -3.0, -0.25, 1.5, -1.5, 2.0]
+            outputs, [total_loss, 2.25, -3.0, -0.25, 1.5, -1.5, 2.0]
         )
 
         if check == 'train':
             model.network.train.assert_called_once_with(mode=True)
             assert model.optimizer.zero_grad.call_count == 1
             assert model.optimizer.step.call_count == 1
-            # backward is not called on the mocked loss, since there are
-            # multiple outputs and the backward is called on the sum of the
-            # multiple outputs
-            assert patched_backward.call_count == 0
         else:
             model.network.train.assert_called_once_with(mode=False)
             assert model.optimizer.zero_grad.call_count == 0
             assert model.optimizer.step.call_count == 0
-            assert patched_backward.call_count == 0
 
     def test_compile(self):
         """Test compile method
 
-        This tests mainly tests the parts of the `Model.compile` method that
+        This test mainly tests the parts of the `Model.compile` method that
         should lead to different results when there are multiple outputs (i.e.
         `Model.n_outputs > 1`) instead of a single one. The only thing that
         changes in the `compile` method is that the `Model.metric_names`
@@ -758,12 +937,7 @@ class TestModel__MultiOutput():
         """
 
         model = MagicMock()
-        model.optimizer = None
-        model.loss = None
-        model._compiled = False
         model.n_outputs = 2
-        model.metric_names = []
-        model.metric_fns = []
         model.compile = Model.compile
 
         metric1 = MagicMock()
@@ -774,23 +948,22 @@ class TestModel__MultiOutput():
 
         mock_parameters = [torch.nn.Parameter(torch.randn((64, 64)))]
         optimizer = Adam(params=mock_parameters, lr=1e-4),
-        loss = BCELoss()
 
-        assert not model.optimizer
-        assert not model.loss
-        assert not model._compiled
+        model.optimizer = None
+        model.loss = None
+        model.loss_functions = None
+        model._compiled = False
+        model.metric_names = []
+        model.metric_fns = []
+        self._check_compile__single_loss_fn(model, metrics, optimizer)
 
-        model.compile(
-            self=model, optimizer=optimizer, loss=loss, metrics=metrics
-        )
-
-        assert model.optimizer
-        assert model.loss
-        assert model._compiled
-        assert model.metric_names == (
-            ['metric11', 'metric12', 'metric21', 'metric22']
-        )
-        assert model.metric_fns == metrics
+        model.optimizer = None
+        model.loss = None
+        model.loss_functions = None
+        model._compiled = False
+        model.metric_names = []
+        model.metric_fns = []
+        self._check_compile__multiple_loss_fns(model, metrics, optimizer)
 
     def test_evaluate(self):
         """Test evaluate"""
@@ -920,6 +1093,9 @@ class TestModel__MultiOutput():
 
         This tests that the correct total number of steps are taken for a given
         `fit` call with a specified `x`, `y`, `batch_size`, and `n_epochs`.
+
+        :param monkeypatch: monkeypatch object
+        :type monkeypatch: _pytest.monkeypatch.MonkeyPatch
         """
 
         model = MagicMock()
@@ -1049,6 +1225,9 @@ class TestModel__MultiOutput():
         `fit` call with a specified `x`, `y`, `batch_size`, and `n_epochs`. It
         also tests that certain objects internal to the `fit` method (e.g. the
         callbacks object) are called as expected.
+
+        :param monkeypatch: monkeypatch object
+        :type monkeypatch: _pytest.monkeypatch.MonkeyPatch
         """
 
         model = MagicMock()
@@ -1175,12 +1354,24 @@ class TestModel__MultiOutput():
             model.stop_training = False
             generator.__next__.call_count = 0
 
-    def test_test_on_batch(self):
-        """Test test_on_batch method"""
+    def test_test_on_batch(self, monkeypatch):
+        """Test test_on_batch method
 
-        self._check_train_or_test_on_batch(check='test')
+        :param monkeypatch: monkeypatch object
+        :type monkeypatch: _pytest.monkeypatch.MonkeyPatch
+        """
 
-    def test_train_on_batch(self):
-        """Test train_on_batch method"""
+        self._check_train_or_test_on_batch(
+            check='test', monkeypatch=monkeypatch
+        )
 
-        self._check_train_or_test_on_batch(check='train')
+    def test_train_on_batch(self, monkeypatch):
+        """Test train_on_batch method
+
+        :param monkeypatch: monkeypatch object
+        :type monkeypatch: _pytest.monkeypatch.MonkeyPatch
+        """
+
+        self._check_train_or_test_on_batch(
+            check='train', monkeypatch=monkeypatch
+        )
