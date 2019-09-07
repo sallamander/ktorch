@@ -121,14 +121,14 @@ class TestModel():
         model._compiled = True
         model._assert_compiled(self=model)
 
-    def test_default_callbacks(self):
-        """Test _default_callbacks method"""
+    def test_load_default_callbacks(self):
+        """Test _load_default_callbacks method"""
 
         model = MagicMock()
         model.history = MagicMock()
-        model._default_callbacks = Model._default_callbacks
+        model._load_default_callbacks = Model._load_default_callbacks
 
-        callbacks = model._default_callbacks(self=model)
+        callbacks = model._load_default_callbacks(self=model)
         assert isinstance(callbacks[0], BaseLogger)
         assert id(callbacks[1]) == id(model.history)
 
@@ -355,9 +355,9 @@ class TestModel():
         ]
 
         for test_case in test_cases:
-            default_callbacks = MagicMock()
-            default_callbacks.return_value = [1, 2, 3]
-            model._default_callbacks = default_callbacks
+            load_default_callbacks = MagicMock()
+            load_default_callbacks.return_value = [1, 2, 3]
+            model._load_default_callbacks = load_default_callbacks
             early_stopping = test_case.get('early_stopping', False)
             if early_stopping:
                 model.stop_training = True
@@ -477,9 +477,9 @@ class TestModel():
         ]
 
         for test_case in test_cases:
-            default_callbacks = MagicMock()
-            default_callbacks.return_value = [1, 2, 3]
-            model._default_callbacks = default_callbacks
+            load_default_callbacks = MagicMock()
+            load_default_callbacks.return_value = [1, 2, 3]
+            model._load_default_callbacks = load_default_callbacks
             early_stopping = test_case.get('early_stopping', False)
             if early_stopping:
                 model.stop_training = True
@@ -948,9 +948,9 @@ class TestModel__MultiOutput():
         ]
 
         for test_case in test_cases:
-            default_callbacks = MagicMock()
-            default_callbacks.return_value = [1, 2, 3]
-            model._default_callbacks = default_callbacks
+            load_default_callbacks = MagicMock()
+            load_default_callbacks.return_value = [1, 2, 3]
+            model._load_default_callbacks = load_default_callbacks
             early_stopping = test_case.get('early_stopping', False)
             if early_stopping:
                 model.stop_training = True
@@ -1080,9 +1080,9 @@ class TestModel__MultiOutput():
         ]
 
         for test_case in test_cases:
-            default_callbacks = MagicMock()
-            default_callbacks.return_value = [1, 2, 3]
-            model._default_callbacks = default_callbacks
+            load_default_callbacks = MagicMock()
+            load_default_callbacks.return_value = [1, 2, 3]
+            model._load_default_callbacks = load_default_callbacks
             early_stopping = test_case.get('early_stopping', False)
             if early_stopping:
                 model.stop_training = True

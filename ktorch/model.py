@@ -64,7 +64,7 @@ class Model():
                    'the `compile` method before training.')
             raise RuntimeError(msg)
 
-    def _default_callbacks(self):
+    def _load_default_callbacks(self):
         """Return default callbacks automatically applied during training
 
         By default, the following callbacks are automatically applied during
@@ -251,7 +251,7 @@ class Model():
         :type validation_data: tuple(numpy.ndarray)
         """
 
-        default_callbacks = self._default_callbacks()
+        default_callbacks = self._load_default_callbacks()
         default_callbacks.append(ProgbarLogger(count_mode='samples'))
         if callbacks:
             default_callbacks.extend(callbacks)
@@ -377,7 +377,7 @@ class Model():
          `n_validation_steps` are passed in
         """
 
-        default_callbacks = self._default_callbacks()
+        default_callbacks = self._load_default_callbacks()
         default_callbacks.append(ProgbarLogger(count_mode='steps'))
         if callbacks:
             default_callbacks.extend(callbacks)
