@@ -440,8 +440,8 @@ class Model():
         self._assert_compiled()
 
         invalid_inputs = (
-            (validation_data is not None and n_validation_steps is None) or
-            (n_validation_steps is not None and validation_data is None)
+            (validation_data is not None and not n_validation_steps) or
+            (n_validation_steps and validation_data is None)
         )
         if invalid_inputs:
             msg = (

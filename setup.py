@@ -24,13 +24,14 @@ setup(
     ),
     license='MIT',
     install_requires=[
+        'future>=0.17.1',
         'keras>=2.2.4',
+        'matplotlib>=3.1.1',
+        'pandas>=0.25.1',
         'tensorboard>=1.14',
-        'future>=0.17.1'
     ],
     extras_require={
         'tests': [
-            'pandas>=0.25.1',
             'pytest',
             'pytest-pep8'
         ]
